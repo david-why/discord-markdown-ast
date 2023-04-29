@@ -356,9 +356,15 @@ def try_parse_node_with_children(
 
     # try finding the matching closer and consume as few tokens as possible
     # (skip the first token as that has to be a child token)
-    # TODO: edge case ***bold and italic*** doesn't work
+    tokens_after_opener = tokens[len(opener) :]
+    skip_after_opener = 0
+    for token_index in range(len(tokens_after_opener)):
+        if tokens_after_opener[token_index].token_type == opener[0]:
+            skip_after_opener += 1
+        else:
+            break
     children_token, amount_consumed_tokens = search_for_closer(
-        tokens[len(opener) + 1 :], closer
+        tokens[len(opener) + 1 :], closer, skip_after_opener
     )
 
     if children_token is None:
@@ -379,10 +385,14 @@ def try_parse_node_with_children(
 
 
 def search_for_closer(
-    tokens: List[Token], closer: List[TokenType]
+    tokens: List[Token], closer: List[TokenType], max_skip_tokens: int = 0
 ) -> Tuple[Optional[List[Token]], Optional[int]]:
     """
     Searches for a specified closing sequence in the supplied list of tokens.
+    
+    The max_skip_tokens parameter is used to fix the bold-italic three-star issue. It
+    works by skipping the first occurrences of the closer IF it exists later in the
+    tokens.
 
     Returns a 2-tuple containing the tokens before the closing sequence starts and the
     amount of tokens that are consumed by this match, i.e., the amount of tokens in the
@@ -390,16 +400,19 @@ def search_for_closer(
 
     Returns None, None if the closer was not found.
     """
+    last_found = -1
     # iterate over tokens
     for token_index in range(len(tokens) - len(closer) + 1):
+        if last_found != -1 and token_index - last_found > max_skip_tokens:
+            return tokens[:last_found], last_found + len(closer)
         # try matching the closer to the current position by iterating over the closer
         for closer_index in range(len(closer)):
             if tokens[token_index + closer_index].token_type != closer[closer_index]:
                 break
         else:
             # closer matched
-            return tokens[:token_index], token_index + len(closer)
-        # closer didn't match, try next token_index
+            last_found = token_index
+        # try next token_index
 
-    # closer was not found
-    return None
+    # return the index
+    return None if last_found == -1 else (tokens[:last_found], last_found + len(closer))
