@@ -78,6 +78,8 @@ def merge_text_nodes(subtree: Iterable[Node]) -> List[Node]:
             if prev_text_node is None:
                 prev_text_node = node
             else:
+                assert prev_text_node.text_content is not None
+                assert node.text_content is not None
                 prev_text_node.text_content += node.text_content
                 continue  # don't store this node
         else:
@@ -119,24 +121,28 @@ def parse_tokens_generator(
 
         # user mentions
         if current_token.token_type == TokenType.USER_MENTION:
+            assert current_token.groups is not None
             yield Node(NodeType.USER, discord_id=int(current_token.groups[0]))
             i += 1
             continue
 
         # role mentions
         if current_token.token_type == TokenType.ROLE_MENTION:
+            assert current_token.groups is not None
             yield Node(NodeType.ROLE, discord_id=int(current_token.groups[0]))
             i += 1
             continue
 
         # channel mentions
         if current_token.token_type == TokenType.CHANNEL_MENTION:
+            assert current_token.groups is not None
             yield Node(NodeType.CHANNEL, discord_id=int(current_token.groups[0]))
             i += 1
             continue
 
         # custom emoji
         if current_token.token_type == TokenType.EMOJI_CUSTOM:
+            assert current_token.groups is not None
             yield Node(
                 NodeType.EMOJI_CUSTOM,
                 discord_id=int(current_token.groups[1]),
@@ -147,6 +153,7 @@ def parse_tokens_generator(
 
         # unicode emoji (when it's encoded as :name: and not just written as unicode)
         if current_token.token_type == TokenType.EMOJI_UNICODE_ENCODED:
+            assert current_token.groups is not None
             yield Node(
                 NodeType.EMOJI_UNICODE_ENCODED,
                 emoji_name=current_token.groups[0],
@@ -189,7 +196,7 @@ def parse_tokens_generator(
             ([TokenType.STAR], NodeType.ITALIC),
             ([TokenType.UNDERSCORE], NodeType.ITALIC),
             ([TokenType.SPOILER_DELIMITER], NodeType.SPOILER),
-            ([TokenType.CODE_INLINE_DELIMITER], NodeType.CODE_INLINE),
+            # ([TokenType.CODE_INLINE_DELIMITER], NodeType.CODE_INLINE),
         ]
 
         node, amount_consumed_tokens = None, None
@@ -200,7 +207,7 @@ def parse_tokens_generator(
             if node is not None:
                 break
 
-        if node is not None:
+        if node is not None and amount_consumed_tokens is not None:
             i += amount_consumed_tokens
             yield node
             continue
@@ -226,7 +233,7 @@ def parse_tokens_generator(
             children_token, amount_consumed_tokens = search_for_closer(
                 tokens[i + 1 :], [TokenType.CODE_BLOCK_DELIMITER]
             )
-            if children_token is not None:
+            if children_token is not None and amount_consumed_tokens is not None:
                 children_content = ""
                 # treat all children token as inline text
                 for child_token in children_token:
@@ -244,6 +251,7 @@ def parse_tokens_generator(
                         break
                 if non_empty_line_found:
                     match = re.fullmatch(r"([a-zA-Z0-9-]*)(.*)", lines[0])
+                    assert match
                     # if there is any behind the lang spec, then it is normal text
                     # otherwise, it is either a lang spec (gets removed from the
                     # displayed text) or it is empty (newline gets removed)
@@ -367,12 +375,12 @@ def try_parse_node_with_children(
         tokens[len(opener) + 1 :], closer, skip_after_opener
     )
 
-    if children_token is None:
+    if children_token is None or amount_consumed_tokens is None:
         # closer not found, abort trying to parse as the selected node type
         return None, None
 
     # put first child token back in
-    children_token = (tokens[len(opener)], *children_token)
+    children_token = [tokens[len(opener)], *children_token]
     amount_consumed_tokens += len(opener) + 1
 
     return (
@@ -389,7 +397,7 @@ def search_for_closer(
 ) -> Tuple[Optional[List[Token]], Optional[int]]:
     """
     Searches for a specified closing sequence in the supplied list of tokens.
-    
+
     The max_skip_tokens parameter is used to fix the bold-italic three-star issue. It
     works by skipping the first occurrences of the closer IF it exists later in the
     tokens.
@@ -415,4 +423,8 @@ def search_for_closer(
         # try next token_index
 
     # return the index
-    return None if last_found == -1 else (tokens[:last_found], last_found + len(closer))
+    return (
+        (None, None)
+        if last_found == -1
+        else (tokens[:last_found], last_found + len(closer))
+    )
