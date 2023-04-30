@@ -80,7 +80,7 @@ def lex(input_text: str) -> Generator[Token, None, None]:
             continue  # don't yield a token in this run
 
         # cut off matched part
-        input_text = input_text[len(match[0]):]
+        input_text = input_text[len(match[0]) :]
 
         # yield inline text if we have some left
         if len(seen_simple_text) > 0:
@@ -106,7 +106,9 @@ lexing_rules = [
     LexingRule(
         token_type=TokenType.EMOJI_CUSTOM, pattern="<:([a-zA-Z0-9_]{2,}):([0-9]+)>"
     ),
-    LexingRule(token_type=TokenType.EMOJI_UNICODE_ENCODED, pattern=":([a-zA-Z0-9_]+):"),
+    LexingRule(
+        token_type=TokenType.EMOJI_UNICODE_ENCODED, pattern=r":([a-zA-Z0-9_\+\-]+):"
+    ),
     LexingRule(token_type=TokenType.URL_WITHOUT_PREVIEW, pattern=f"<{URL_REGEX}>"),
     LexingRule(token_type=TokenType.URL_WITH_PREVIEW, pattern=URL_REGEX),
     LexingRule(token_type=TokenType.QUOTE_LINE_PREFIX, pattern=r"(>>)?> "),
