@@ -212,6 +212,23 @@ def parse_tokens_generator(
             yield node
             continue
 
+        # === inline code
+        # these are similar to text modifiers but only contain inline text, all other
+        # markdown rules are disabled inside
+        if current_token.token_type == TokenType.CODE_INLINE_DELIMITER:
+            children_token, amount_consumed_tokens = search_for_closer(
+                tokens[i + 1 :], [TokenType.CODE_INLINE_DELIMITER]
+            )
+            if children_token is not None and amount_consumed_tokens is not None:
+                children_content = ""
+                # treat all children token as inline text
+                for child_token in children_token:
+                    children_content += child_token.value
+                child_node = Node(NodeType.TEXT, text_content=children_content)
+                yield Node(NodeType.CODE_INLINE, children=[child_node])
+                i += 1 + amount_consumed_tokens
+                continue
+
         # === code blocks
         # these are similar to text modifiers but have some additional twists
         # - code blocks only contain inline text, all other markdown rules are disabled
